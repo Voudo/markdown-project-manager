@@ -1,0 +1,17 @@
+{
+  "name": "markdown-project-manager",
+  "version": "0.1.0",
+  "description": "A CLI to quickly create project management tasks.",
+  "main": "createIssues.js",
+  "author": "chad beninati",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+
+  "dependencies": {
+    "@octokit/core": "^3.5.1",
+    "inquirer": "^8.2.0",
+    "inquirer-search-list": "^1.2.6"
+  }
+}
+  
