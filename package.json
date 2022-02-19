@@ -4,8 +4,6 @@
   "description": "A CLI to quickly create project management tasks.",
   "main": "createIssues.js",
   "author": "chad beninati",
-  "license": "MIT",
-  "private": true,
   "type": "module",
 
   "dependencies": {
