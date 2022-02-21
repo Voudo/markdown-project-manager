@@ -26,6 +26,8 @@ const buildItemFromSection = (section) => {
 
 export const markdownToGithubIssue = (text) => {
   const sections = text.match(getMatchToMatchOrFileEnd)
+  
+  // TODO: Fail gracefully if there is no matching section. - Chad 
 
   return sections.map(buildItemFromSection)
 }
