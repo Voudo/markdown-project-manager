@@ -4,81 +4,73 @@ import searchList from 'inquirer-search-list'
 inquirer.registerPrompt('search-list', searchList)
 
 import { markdownToGithubIssue } from './parser/githubIssueMarkdownParser.js'
-import { createIssuesForRepo } from './githubIssues/create.js'
-import { listReposForOrg } from './githubIssues/getRepos.js'
+import { createIssueCardsForProject, createIssuesForRepo } from './githubIssues/create.js'
+import { listColumnsForProject, listProjectsForOrg, searchForRepo } from './githubIssues/getRepos.js'
 
+const promptToAddIssuesToAProject = async (issues) => {
+  const projects = await listProjectsForOrg('articulate')
 
-const questions = (repoNames) => ([
-  {
+  inquirer.prompt({
     type: 'search-list',
-    name: 'repo',
-    message: 'Select a repo:',
-    choices: repoNames,
-  },
-  {
-    type: 'list',
-    name: 'input',
-    message: 'How do you want to create the issues?',
-    choices: [
-      'Create in editor',
-      { name: 'Load from a markdown file', disabled: 'Coming soon...' },
-    ],
-    validate(answer) {
-      return answer.length != 1
-        ? 'You must select an input.'
-        : true
-    },
-  },
-])
+    name: 'projectId',
+    message: `Add ${issues.length} issue/s to a project?`,
+    choices: projects.map((project) => ({ name: project.name, value: project.id })),
+  })
+    .then(async (response) => {
+      const columns = await listColumnsForProject(response.projectId)
+      const issueIds = issues.map((issue) => issue?.data?.id)
 
-inquirer
-  .prompt({
+      createIssueCardsForProject(columns[0]?.id, issueIds)
+        .then((response) => {
+          console.log(`A-ok! Successfully created ${response.length} new cards!`)
+        })
+    })
+}
+
+const promptRepository = (repositoryName, issues, editorContent) => {
+  searchForRepo(repositoryName)
+    .then((repositories) => {
+      if (repositories?.data?.items.length) {
+        inquirer.prompt({
+          type: 'search-list',
+          name: 'repo',
+          message: 'Select a repo:',
+          choices: repositories?.data?.items.map((repo) => repo.full_name),
+        }).then((selectedRepo) => {
+          createIssuesForRepo(selectedRepo.repo, issues)
+            .then((response) => {
+              promptToAddIssuesToAProject(response)
+              console.log(`Woot! ${issues.length} issue/s were created, yo.`)
+            })
+        })
+      } else {
+        console.log('ERROR: I couldn\'t find any matching repos. Please try that again.')
+        console.log('-------------')
+        promptToCreateNewIssuesFromEditorContent(editorContent)
+      }
+    })
+}
+
+const promptToCreateNewIssuesFromEditorContent = (editorContent) => {
+  const issues = markdownToGithubIssue(editorContent)
+
+  // TODO: Allow optionally selecting cards to create or save for later or delete. - Chad
+  console.log('issues', issues)
+
+  inquirer.prompt({
     type: 'input',
-    name: 'organization',
-    message: 'What organization are you in?',
+    name: 'repositoryName',
+    message: `You're about to create ${issues.length} issue/s.\nWhat repository do they belong in?`,
+  }).then((response) => {
+    promptRepository(response.repositoryName, issues, editorContent)
   })
-  .then((orgResponse) => {
-    listReposForOrg(orgResponse.organization)
-      .then((repos) => {
-        const repoNames = repos.data.map((repo) => repo.full_name)
-
-        inquirer
-          .prompt(questions(repoNames))
-          .then((responses) => {
-            if (responses.input === 'Create in editor') {
-              inquirer.prompt({
-                type: 'editor',
-                name: 'editor',
-                message: 'Open your editor to create a markdown file.',
-              })
-              .then((editorResponse) => {
-                const issues = markdownToGithubIssue(editorResponse.editor)
-        
-                // TODO: Allow optionally selecting cards to create or save for later or delete. - Chad
-                console.log('issues', issues)
-        
-                inquirer.prompt({
-                  type: 'confirm',
-                  name: 'confirm',
-                  message: `Create ${issues.length} issues?`,
-                }).then((response) => {
-                  if (response.confirm === true) {
-                    createIssuesForRepo(responses.repo, issues)
-                  } else {
-                    // TODO: prompt to return to editor or end. - Chad
-                  }
-                })
-              })
-            } else {
-              inquirer.prompt({
-                type: 'editor',
-                name: 'editor',
-                message: 'What is the path to the markdown file?',
-              })
-              .then((path) => {
-                // TODO: Load markdown file, then parse, then createIssue. - Chad
-              })
-            }
-          })
-      })
-  })
+}
+ 
+inquirer.prompt({
+  type: 'editor',
+  name: 'editor',
+  message: 'Open your editor to create a markdown file.',
+})
+.then((editorResponse) => {
+  promptToCreateNewIssuesFromEditorContent(editorResponse.editor)
+})
